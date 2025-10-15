@@ -13,6 +13,16 @@ interface Ticket {
   metadata_updated_at?: string;
 }
 
+interface PaginationInfo {
+  limit: number;
+  offset: number;
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  hasMore: boolean;
+  hasPrevious: boolean;
+}
+
 export default function AdminTickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +30,16 @@ export default function AdminTickets() {
   const [filter, setFilter] = useState<string>('all'); // 'all', 'entered', 'not-entered'
   const [search, setSearch] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    limit: 100,
+    offset: 0,
+    totalCount: 0,
+    totalPages: 0,
+    currentPage: 1,
+    hasMore: false,
+    hasPrevious: false,
+  });
+  const [rowsPerPage, setRowsPerPage] = useState(100);
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -29,7 +49,7 @@ export default function AdminTickets() {
     }
     setIsAuthenticated(true);
     fetchTickets();
-  }, [filter, search]);
+  }, [filter, search, pagination.offset, rowsPerPage]);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -42,6 +62,8 @@ export default function AdminTickets() {
       if (filter === 'entered') params.append('entered', 'true');
       if (filter === 'not-entered') params.append('entered', 'false');
       if (search.trim()) params.append('q', search.trim());
+      params.append('limit', rowsPerPage.toString());
+      params.append('offset', pagination.offset.toString());
 
       const response = await fetch(`/api/admin/tickets?${params.toString()}`, {
         headers: {
@@ -52,6 +74,7 @@ export default function AdminTickets() {
       if (response.ok) {
         const data = await response.json();
         setTickets(data.tickets);
+        setPagination(data.pagination);
       } else {
         const errorData = await response.json();
         if (response.status === 401) {
@@ -71,6 +94,26 @@ export default function AdminTickets() {
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     window.location.href = '/admin/login';
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const newOffset = (newPage - 1) * rowsPerPage;
+    setPagination(prev => ({ ...prev, offset: newOffset }));
+  };
+
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage);
+    setPagination(prev => ({ ...prev, offset: 0 })); // Reset to first page
+  };
+
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    setPagination(prev => ({ ...prev, offset: 0 })); // Reset to first page when filtering
+  };
+
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    setPagination(prev => ({ ...prev, offset: 0 })); // Reset to first page when searching
   };
 
   if (!isAuthenticated) {
@@ -101,14 +144,14 @@ export default function AdminTickets() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Filter by Status
               </label>
               <select
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={(e) => handleFilterChange(e.target.value)}
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Tickets</option>
@@ -124,20 +167,42 @@ export default function AdminTickets() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search by ticket ID or token..."
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rows per page
+              </label>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => handleRowsPerPageChange(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+              </select>
+            </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 flex justify-between items-center">
             <button
               onClick={fetchTickets}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
               Refresh
             </button>
+            
+            {/* Pagination Info */}
+            <div className="text-sm text-gray-600">
+              Showing {pagination.offset + 1} to {Math.min(pagination.offset + pagination.limit, pagination.totalCount)} of {pagination.totalCount} tickets
+            </div>
           </div>
         </div>
 
@@ -238,16 +303,88 @@ export default function AdminTickets() {
               </table>
             </div>
 
-            {/* Summary */}
-            <div className="bg-gray-50 px-6 py-3 border-t">
-              <p className="text-sm text-gray-700">
-                Showing {tickets.length} tickets
-                {filter !== 'all' && (
-                  <span className="ml-2 text-gray-500">
-                    (filtered by: {filter.replace('-', ' ')})
-                  </span>
-                )}
-              </p>
+            {/* Pagination Controls */}
+            <div className="bg-gray-50 px-6 py-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-gray-700">
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                    {filter !== 'all' && (
+                      <span className="ml-2 text-gray-500">
+                        (filtered by: {filter.replace('-', ' ')})
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {/* First Page */}
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={!pagination.hasPrevious}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                  >
+                    First
+                  </button>
+
+                  {/* Previous Page */}
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={!pagination.hasPrevious}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                  >
+                    Previous
+                  </button>
+
+                  {/* Page Numbers */}
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (pagination.currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (pagination.currentPage >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i;
+                      } else {
+                        pageNum = pagination.currentPage - 2 + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1 border rounded text-sm ${
+                            pageNum === pagination.currentPage
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Page */}
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={!pagination.hasMore}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                  >
+                    Next
+                  </button>
+
+                  {/* Last Page */}
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={!pagination.hasMore}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

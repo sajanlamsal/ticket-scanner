@@ -347,6 +347,42 @@ class DatabaseManager {
     throw new Error('Database not initialized');
   }
 
+  async getTicketsCount(filter?: { entered?: boolean; search?: string }): Promise<number> {
+    let query = 'SELECT COUNT(*) as count FROM ticket_entry WHERE 1=1';
+    const params: any[] = [];
+    let paramCount = 0;
+
+    if (filter?.entered === true) {
+      query += ` AND entered_at IS NOT NULL`;
+    } else if (filter?.entered === false) {
+      query += ` AND entered_at IS NULL`;
+    }
+
+    if (filter?.search) {
+      paramCount++;
+      if (this.dbType === 'sqlite') {
+        query += ` AND (CAST(id AS TEXT) LIKE ? OR token LIKE ?)`;
+        params.push(`%${filter.search}%`, `%${filter.search}%`);
+        paramCount++;
+      } else {
+        query += ` AND (CAST(id AS TEXT) LIKE $${paramCount} OR token LIKE $${paramCount + 1})`;
+        params.push(`%${filter.search}%`, `%${filter.search}%`);
+        paramCount++;
+      }
+    }
+
+    if (this.dbType === 'sqlite' && this.sqlite) {
+      const stmt = this.sqlite.prepare(query);
+      const result = stmt.get(...params) as { count: number };
+      return result.count;
+    } else if (this.postgres) {
+      const result = await this.postgres.query(query, params);
+      return parseInt(result.rows[0].count);
+    }
+    
+    throw new Error('Database not initialized');
+  }
+
   async close() {
     if (this.sqlite) {
       this.sqlite.close();

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const limitParam = url.searchParams.get('limit');
     const offsetParam = url.searchParams.get('offset');
 
-    const limit = limitParam ? parseInt(limitParam) : 50;
+    const limit = limitParam ? parseInt(limitParam) : 100;
     const offset = offsetParam ? parseInt(offsetParam) : 0;
 
     let filter: { entered?: boolean; search?: string } = {};
@@ -29,7 +29,13 @@ export async function GET(request: NextRequest) {
     }
 
     const db = getDB();
-    const tickets = await db.getTickets(filter, limit, offset);
+    const [tickets, totalCount] = await Promise.all([
+      db.getTickets(filter, limit, offset),
+      db.getTicketsCount(filter)
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const currentPage = Math.floor(offset / limit) + 1;
 
     return NextResponse.json({
       tickets,
@@ -37,7 +43,11 @@ export async function GET(request: NextRequest) {
       pagination: {
         limit,
         offset,
-        hasMore: tickets.length === limit,
+        totalCount,
+        totalPages,
+        currentPage,
+        hasMore: tickets.length === limit && offset + limit < totalCount,
+        hasPrevious: offset > 0,
       },
     });
 
