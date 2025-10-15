@@ -27,8 +27,8 @@ export default function AdminLogin() {
       if (response.ok) {
         // Store token in localStorage
         localStorage.setItem('adminToken', data.accessToken);
-        // Redirect to scanner
-        window.location.href = '/scan';
+        // Redirect to admin dashboard
+        window.location.href = '/admin';
       } else {
         setError(data.error || 'Login failed');
       }

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const host = request.headers.get('host') || 'localhost:3000';
     const baseUrl = `${protocol}://${host}`;
 
-    // Generate tickets
+    // Generate tickets (no database entries - created on-demand when scanned/accessed)
     const tickets: GeneratedTicket[] = [];
     const csvLines = ['ticketId,eventId,token,qrUrl'];
 
@@ -80,13 +80,8 @@ export async function POST(request: NextRequest) {
       const token = generateToken(ticketId, eventId);
       const qrUrl = `${baseUrl}/entry/${token}`;
       
-      // Store in database
-      try {
-        await db.insertOrUpdateTicket(ticketId, token, eventId);
-      } catch (dbError) {
-        console.error(`Error inserting ticket ${ticketId}:`, dbError);
-        // Continue with other tickets even if one fails
-      }
+      // No database storage during generation - tickets are created on-demand
+      // when they are first scanned or accessed via /entry/{token}
 
       tickets.push({
         ticketId,
@@ -107,7 +102,7 @@ export async function POST(request: NextRequest) {
       totalGenerated: tickets.length,
       eventId,
       ticketRange: `1-${ticketUpTo}`,
-      message: `Successfully generated ${tickets.length} tickets for event ${eventId}`,
+      message: `Successfully generated ${tickets.length} ticket tokens for event ${eventId} (database entries created on-demand)`,
     });
 
   } catch (error) {

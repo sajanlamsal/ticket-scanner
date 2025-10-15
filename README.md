@@ -116,7 +116,7 @@ npm run dev
 Visit:
 - **Homepage**: http://localhost:3000
 - **Admin Login**: http://localhost:3000/admin/login
-- **QR Scanner**: http://localhost:3000/scan
+- **QR Scanner**: http://localhost:3000/admin/scanner
 - **Example Ticket**: http://localhost:3000/entry/[token]
 
 ## API Documentation
@@ -375,7 +375,7 @@ npm start
 3. **Admin Authentication**
    - Login at `/admin/login` with seeded credentials
    - Receive JWT token in response
-   - Access protected `/scan` page
+   - Access protected `/admin/scanner` page
 
 4. **Entry Validation**
    - Scan token via QR or manual entry
