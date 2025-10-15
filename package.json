@@ -1,0 +1,50 @@
+{
+  "name": "nepathya-ticket-prototype",
+  "version": "1.0.0",
+  "description": "QR ticket verification system for events",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "generate-tokens": "tsx scripts/generate_tokens.ts",
+    "seed-admin": "tsx scripts/seed_admin.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "autoprefixer": "^10.4.16",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.1.1",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "hashids": "^2.3.0",
+    "html5-qrcode": "^2.3.8",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.3",
+    "next": "^14.0.0",
+    "pg": "^8.11.3",
+    "postcss": "^8.4.31",
+    "qrcode": "^1.5.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.3.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.7",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.9.0",
+    "@types/pg": "^8.10.7",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "eslint": "^8.52.0",
+    "eslint-config-next": "^14.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
