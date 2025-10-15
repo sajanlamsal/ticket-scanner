@@ -4,6 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useRouter } from 'next/navigation';
 import { validateAndExtractToken } from '@/lib/qr-validation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Camera, FileText, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 
 interface ScanResult {
   type: 'success' | 'error' | 'warning';
@@ -335,114 +340,131 @@ export default function ScannerPage() {
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">QR Scanner</h1>
-            <div className="flex gap-2">
-              <button
-                onClick={clearMemory}
-                className="bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600"
-              >
-                Clear {scanMemory ? '(1)' : '(0)'}
-              </button>
-              <button
-                onClick={() => router.push('/admin/tickets')}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-              >
-                Tickets
-              </button>
-            </div>
-          </div>
-
-          {/* Scanner Status */}
-          <div className="mb-4">
-            {scannerError ? (
-              <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-red-600">
-                  <div className="h-2 w-2 bg-red-500 rounded-full"></div>
-                  <span className="text-sm">{scannerError}</span>
-                </div>
-                <button
-                  onClick={retryCamera}
-                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="w-6 h-6" />
+                QR Scanner
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearMemory}
                 >
-                  Retry
-                </button>
+                  Clear {scanMemory ? '(1)' : '(0)'}
+                </Button>
+                <Button
+                  onClick={() => router.push('/admin/tickets')}
+                  size="sm"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Tickets
+                </Button>
               </div>
-            ) : !scannerReady ? (
-              <div className="flex items-center gap-2 text-blue-600">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span>
-                  {permissionGranted === null ? 'Requesting camera access...' : 
-                   permissionGranted === false ? 'Camera access denied' :
-                   'Starting camera...'}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-green-600">
-                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>Camera ready • Point at QR code</span>
-                {isProcessing && <span className="text-orange-600">• Processing...</span>}
-              </div>
-            )}
-          </div>
+            </div>
+          </CardHeader>
+          <CardContent>
 
-          {/* Scanner Container */}
-          <div className="border rounded-lg overflow-hidden bg-gray-50">
-            <div id="qr-scanner-container" className="min-h-[400px]" />
-          </div>
-
-          {/* Result Display - Fixed position, no flickering */}
-          <div className="mt-4 h-32">
-            {currentResult && (
-              <div className={`p-4 rounded-lg border ${
-                currentResult.type === 'success' ? 'bg-green-50 border-green-200' :
-                currentResult.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
-                'bg-red-50 border-red-200'
-              } transition-all duration-300 ease-in-out`}>
-                <h3 className="font-bold text-lg mb-1">{currentResult.title}</h3>
-                <p className="text-sm opacity-75 mb-2">{currentResult.message}</p>
-                
-                {currentResult.details && (
-                  <div className="text-xs space-y-1 opacity-60">
-                    {currentResult.details.eventName && <div>Event: {currentResult.details.eventName}</div>}
-                    {currentResult.details.ticketId && <div>Ticket: #{currentResult.details.ticketId}</div>}
-                    {currentResult.details.attendee_name && <div>Name: {currentResult.details.attendee_name}</div>}
+            {/* Scanner Status */}
+            <div className="mb-4">
+              {scannerError ? (
+                <div className="flex items-center justify-between bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm">{scannerError}</span>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={retryCamera}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : !scannerReady ? (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="animate-pulse">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {permissionGranted === null ? 'Requesting camera access...' : 
+                     permissionGranted === false ? 'Camera access denied' :
+                     'Starting camera...'}
+                  </Badge>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Camera ready • Point at QR code
+                  </Badge>
+                  {isProcessing && (
+                    <Badge variant="secondary" className="animate-pulse">
+                      Processing...
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Manual Entry Fallback */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <details className="cursor-pointer">
-              <summary className="text-sm font-medium text-gray-600 hover:text-gray-800">
-                Manual Token Entry (Backup)
-              </summary>
-              <div className="mt-3">
-                <input
-                  type="text"
-                  placeholder="Enter token manually (e.g., 95WhBX)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const token = e.currentTarget.value.trim();
-                      if (token) {
-                        handleScanSuccess(token);
-                        e.currentTarget.value = '';
+            {/* Scanner Container */}
+            <div className="border rounded-lg overflow-hidden bg-muted/50">
+              <div id="qr-scanner-container" className="min-h-[400px]" />
+            </div>
+
+            {/* Result Display - Fixed position, no flickering */}
+            <div className="mt-4 h-32">
+              {currentResult && (
+                <Card className={`transition-all duration-300 ease-in-out ${
+                  currentResult.type === 'success' ? 'border-green-200 bg-green-50/50' :
+                  currentResult.type === 'warning' ? 'border-yellow-200 bg-yellow-50/50' :
+                  'border-destructive/20 bg-destructive/5'
+                }`}>
+                  <CardContent className="p-4">
+                    <h3 className="font-bold text-lg mb-1">{currentResult.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">{currentResult.message}</p>
+                    
+                    {currentResult.details && (
+                      <div className="text-xs space-y-1 text-muted-foreground">
+                        {currentResult.details.eventName && <div>Event: {currentResult.details.eventName}</div>}
+                        {currentResult.details.ticketId && <div>Ticket: #{currentResult.details.ticketId}</div>}
+                        {currentResult.details.attendee_name && <div>Name: {currentResult.details.attendee_name}</div>}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Manual Entry Fallback */}
+            <div className="mt-6 pt-6 border-t">
+              <details className="cursor-pointer">
+                <summary className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                  Manual Token Entry (Backup)
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter token manually (e.g., 95WhBX)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const token = e.currentTarget.value.trim();
+                        if (token) {
+                          handleScanSuccess(token);
+                          e.currentTarget.value = '';
+                        }
                       }
-                    }
-                  }}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Press Enter after typing token
-                </p>
-              </div>
-            </details>
-          </div>
-        </div>
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Press Enter after typing token
+                  </p>
+                </div>
+              </details>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

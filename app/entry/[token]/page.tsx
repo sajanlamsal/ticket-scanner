@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, Clock, Ticket } from 'lucide-react';
 
 interface AttendeeInfo {
   name?: string;
@@ -87,8 +93,12 @@ export default function EntryPage({ params }: { params: { token: string } }) {
   if (loading) {
     return (
       <div className="container mx-auto p-4">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-          <p className="text-center">Loading ticket information...</p>
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-center">Loading ticket information...</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -97,9 +107,15 @@ export default function EntryPage({ params }: { params: { token: string } }) {
   if (error) {
     return (
       <div className="container mx-auto p-4">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-center mb-4 text-red-600">Error</h1>
-          <p className="text-center text-gray-600">{error}</p>
+        <div className="max-w-md mx-auto">
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="text-center text-destructive">Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-muted-foreground">{error}</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -107,11 +123,17 @@ export default function EntryPage({ params }: { params: { token: string } }) {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-center mb-6">Event Ticket</h1>
-        
-        {ticketInfo && (
-          <>
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center flex items-center justify-center gap-2">
+              <Ticket className="w-6 h-6" />
+              Event Ticket
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {ticketInfo && (
+              <>
             {/* Event Information */}
             <div className="mb-6 p-4 rounded-lg border bg-blue-50">
               <h2 className="font-bold text-lg mb-2 text-blue-800">{ticketInfo.event_name}</h2>
@@ -190,32 +212,36 @@ export default function EntryPage({ params }: { params: { token: string } }) {
               </form>
             </div>
 
-            {/* Current Information Display */}
-            {(ticketInfo.attendee_name || ticketInfo.attendee_phone) && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="font-bold mb-2">Current Information</h3>
-                <div className="space-y-1 text-sm">
-                  {ticketInfo.attendee_name && (
-                    <p><strong>Name:</strong> {ticketInfo.attendee_name}</p>
-                  )}
-                  {ticketInfo.attendee_phone && (
-                    <p><strong>Phone:</strong> {ticketInfo.attendee_phone}</p>
-                  )}
-                  {ticketInfo.metadata_updated_at && (
-                    <p className="text-gray-500">
-                      Last updated: {new Date(ticketInfo.metadata_updated_at).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+              {/* Current Information Display */}
+              {(ticketInfo.attendee_name || ticketInfo.attendee_phone) && (
+                <Card className="bg-muted/50">
+                  <CardContent className="p-4">
+                    <h3 className="font-bold mb-2">Current Information</h3>
+                    <div className="space-y-1 text-sm">
+                      {ticketInfo.attendee_name && (
+                        <p><strong>Name:</strong> {ticketInfo.attendee_name}</p>
+                      )}
+                      {ticketInfo.attendee_phone && (
+                        <p><strong>Phone:</strong> {ticketInfo.attendee_phone}</p>
+                      )}
+                      {ticketInfo.metadata_updated_at && (
+                        <p className="text-muted-foreground">
+                          Last updated: {new Date(ticketInfo.metadata_updated_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-        {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
-          <p>Keep this page bookmarked for easy access to your ticket.</p>
-        </div>
+              {/* Footer */}
+              <div className="text-center text-sm text-muted-foreground border-t pt-4">
+                <p>Keep this page bookmarked for easy access to your ticket.</p>
+              </div>
+            </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

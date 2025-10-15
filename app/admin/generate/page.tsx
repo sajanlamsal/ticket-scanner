@@ -4,6 +4,11 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, QrCode, Download, FileDown, Eye, EyeOff } from 'lucide-react';
 
 interface GeneratedTicket {
   ticketId: number;
@@ -220,105 +225,122 @@ export default function GenerateTicketsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Generate QR Tickets</h1>
-            <Link href="/admin" className="text-blue-600 hover:text-blue-800">
-              ← Back to Admin
-            </Link>
-          </div>
-          <p className="text-gray-600">
-            Generate QR codes for event tickets using the hashids algorithm. 
-            Specify event ID and maximum ticket number to generate.
-          </p>
-        </div>
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="w-6 h-6" />
+                  Generate QR Tickets
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Generate QR codes for event tickets using the hashids algorithm. 
+                  Specify event ID and maximum ticket number to generate.
+                </p>
+              </div>
+              <Button variant="ghost" asChild>
+                <Link href="/admin">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Admin
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
 
         {/* Generation Form */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Generation Parameters</h2>
-          
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Event ID
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={eventId}
-                onChange={(e) => setEventId(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter event ID"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Unique identifier for the event
-              </p>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Generation Parameters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-2">
+                <Label htmlFor="eventId">Event ID</Label>
+                <Input
+                  id="eventId"
+                  type="number"
+                  min="1"
+                  value={eventId}
+                  onChange={(e) => setEventId(parseInt(e.target.value) || 1)}
+                  placeholder="Enter event ID"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Unique identifier for the event
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ticketUpTo">Tickets Up To</Label>
+                <Input
+                  id="ticketUpTo"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={ticketUpTo}
+                  onChange={(e) => setTicketUpTo(parseInt(e.target.value) || 1)}
+                  placeholder="Maximum ticket number"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Generate tickets from 1 to this number
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tickets Up To
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10000"
-                value={ticketUpTo}
-                onChange={(e) => setTicketUpTo(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Maximum ticket number"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Generate tickets from 1 to this number
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <button
+            <Button
               onClick={generateTickets}
               disabled={isGenerating || ticketUpTo < 1 || eventId < 1}
-              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+              className="w-full"
             >
               {isGenerating ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <span className="flex items-center">
+                  <div className="animate-spin -ml-1 mr-3 h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                   Generating...
                 </span>
               ) : (
                 `Generate ${ticketUpTo} Tickets`
               )}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* QR Code Customization */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-semibold">QR Code & Layout Settings</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                🏷️ Default: A-one 40面 format - QR code + padded ticket number (00001, 00002...)
-              </p>
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>QR Code & Layout Settings</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  🏷️ Default: A-one 40面 format - QR code + padded ticket number (00001, 00002...)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPreview(!showPreview);
+                  if (!showPreview) {
+                    generatePreviewQR();
+                  }
+                }}
+              >
+                {showPreview ? (
+                  <>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Hide Preview
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Show Preview
+                  </>
+                )}
+              </Button>
             </div>
-            <button
-              onClick={() => {
-                setShowPreview(!showPreview);
-                if (!showPreview) {
-                  generatePreviewQR();
-                }
-              }}
-              className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
-            >
-              {showPreview ? 'Hide Preview' : 'Show Preview'}
-            </button>
-          </div>
+          </CardHeader>
+          <CardContent>
           
           <div className="grid md:grid-cols-2 gap-8">
             {/* Settings Panel */}
@@ -604,23 +626,28 @@ export default function GenerateTicketsPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-700">{error}</p>
-            </div>
-          )}
-        </div>
+            {error && (
+              <Card className="mt-4 border-destructive/20 bg-destructive/5">
+                <CardContent className="p-4">
+                  <p className="text-destructive">{error}</p>
+                </CardContent>
+              </Card>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Results */}
         {result && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Generation Results</h2>
-            
-            <div className="mb-6">
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
-                <div className="bg-gray-50 p-4 rounded-md text-center">
-                  <div className="text-2xl font-bold text-blue-600">{result.totalGenerated}</div>
-                  <div className="text-sm text-gray-600">Tickets Generated</div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Generation Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6">
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-muted/50 p-4 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-primary">{result.totalGenerated}</div>
+                    <div className="text-sm text-muted-foreground">Tickets Generated</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-md text-center">
                   <div className="text-2xl font-bold text-green-600">{eventId}</div>
@@ -648,11 +675,11 @@ export default function GenerateTicketsPage() {
               </div>
             </div>
 
-            {/* Sample Preview */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-3">Sample Generated Tickets (First 10)</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300">
+              {/* Sample Preview */}
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-3">Sample Generated Tickets (First 10)</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-border">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="border border-gray-300 px-4 py-2 text-left">Ticket ID</th>
@@ -682,50 +709,16 @@ export default function GenerateTicketsPage() {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Hidden canvas for QR generation */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
-      
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .slider::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .slider::-webkit-slider-track {
-          height: 8px;
-          border-radius: 4px;
-          background: #e5e7eb;
-        }
-        
-        .slider::-moz-range-track {
-          height: 8px;
-          border-radius: 4px;
-          background: #e5e7eb;
-        }
-      `}</style>
     </div>
   );
 }

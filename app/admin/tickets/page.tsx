@@ -1,6 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface Ticket {
   id: number;
@@ -127,190 +134,178 @@ export default function AdminTickets() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Ticket Management</h1>
           <div className="space-x-4">
-            <a
-              href="/admin/scanner"
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-            >
-              QR Scanner
-            </a>
-            <button
+            <Button asChild>
+              <a href="/admin/scanner">
+                QR Scanner
+              </a>
+            </Button>
+            <Button 
+              variant="ghost" 
               onClick={handleLogout}
               className="text-red-600 hover:text-red-800"
             >
               Logout
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filter by Status
-              </label>
-              <select
-                value={filter}
-                onChange={(e) => handleFilterChange(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">All Tickets</option>
-                <option value="entered">Entered</option>
-                <option value="not-entered">Not Entered</option>
-              </select>
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Filter by Status</Label>
+                <Select value={filter} onValueChange={handleFilterChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tickets</SelectItem>
+                    <SelectItem value="entered">Entered</SelectItem>
+                    <SelectItem value="not-entered">Not Entered</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Search (ID or Token)</Label>
+                <Input
+                  type="text"
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Search by ticket ID or token..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rows per page</Label>
+                <Select value={rowsPerPage.toString()} onValueChange={(value) => handleRowsPerPageChange(parseInt(value))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="250">250</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search (ID or Token)
-              </label>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by ticket ID or token..."
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
-              />
+            <div className="mt-4 flex justify-between items-center">
+              <Button onClick={fetchTickets}>
+                Refresh
+              </Button>
+              
+              {/* Pagination Info */}
+              <div className="text-sm text-muted-foreground">
+                Showing {pagination.offset + 1} to {Math.min(pagination.offset + pagination.limit, pagination.totalCount)} of {pagination.totalCount} tickets
+              </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rows per page
-              </label>
-              <select
-                value={rowsPerPage}
-                onChange={(e) => handleRowsPerPageChange(parseInt(e.target.value))}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-                <option value={500}>500</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-between items-center">
-            <button
-              onClick={fetchTickets}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Refresh
-            </button>
-            
-            {/* Pagination Info */}
-            <div className="text-sm text-gray-600">
-              Showing {pagination.offset + 1} to {Math.min(pagination.offset + pagination.limit, pagination.totalCount)} of {pagination.totalCount} tickets
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800">{error}</p>
-          </div>
+          <Card className="mb-6 border-destructive">
+            <CardContent className="p-4">
+              <p className="text-destructive">{error}</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Loading */}
         {loading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-blue-800 text-center">Loading tickets...</p>
-          </div>
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <p className="text-center">Loading tickets...</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Tickets Table */}
         {!loading && (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <Card>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ticket ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Token
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Attendee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Entry Info
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ticket ID</TableHead>
+                    <TableHead>Token</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Attendee</TableHead>
+                    <TableHead>Entry Info</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {tickets.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
                         No tickets found
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     tickets.map((ticket) => (
-                      <tr key={ticket.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <TableRow key={ticket.id}>
+                        <TableCell className="font-medium">
                           #{ticket.id}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
                           {ticket.token}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell>
                           {ticket.entered_at ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
                               Entered
-                            </span>
+                            </Badge>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                               Pending
-                            </span>
+                            </Badge>
                           )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        </TableCell>
+                        <TableCell>
                           <div>
                             {ticket.attendee_name && (
                               <div className="font-medium">{ticket.attendee_name}</div>
                             )}
                             {ticket.attendee_phone && (
-                              <div className="text-gray-500">{ticket.attendee_phone}</div>
+                              <div className="text-muted-foreground text-sm">{ticket.attendee_phone}</div>
                             )}
                             {!ticket.attendee_name && !ticket.attendee_phone && (
-                              <span className="text-gray-400">No info</span>
+                              <span className="text-muted-foreground">No info</span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        </TableCell>
+                        <TableCell className="text-sm">
                           {ticket.entered_at ? (
                             <div>
                               <div>{new Date(ticket.entered_at).toLocaleString()}</div>
                               {ticket.entered_by && (
-                                <div className="text-xs">by {ticket.entered_by}</div>
+                                <div className="text-xs text-muted-foreground">by {ticket.entered_by}</div>
                               )}
                             </div>
                           ) : (
-                            <span className="text-gray-400">Not entered</span>
+                            <span className="text-muted-foreground">Not entered</span>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {/* Pagination Controls */}
-            <div className="bg-gray-50 px-6 py-4 border-t">
+            <div className="border-t p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <p className="text-sm text-gray-700">
+                  <p className="text-sm text-muted-foreground">
                     Page {pagination.currentPage} of {pagination.totalPages}
                     {filter !== 'all' && (
-                      <span className="ml-2 text-gray-500">
+                      <span className="ml-2">
                         (filtered by: {filter.replace('-', ' ')})
                       </span>
                     )}
@@ -319,22 +314,24 @@ export default function AdminTickets() {
 
                 <div className="flex items-center space-x-2">
                   {/* First Page */}
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(1)}
                     disabled={!pagination.hasPrevious}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                   >
                     First
-                  </button>
+                  </Button>
 
                   {/* Previous Page */}
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(pagination.currentPage - 1)}
                     disabled={!pagination.hasPrevious}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                   >
                     Previous
-                  </button>
+                  </Button>
 
                   {/* Page Numbers */}
                   <div className="flex items-center space-x-1">
@@ -351,42 +348,41 @@ export default function AdminTickets() {
                       }
 
                       return (
-                        <button
+                        <Button
                           key={pageNum}
+                          variant={pageNum === pagination.currentPage ? "default" : "outline"}
+                          size="sm"
                           onClick={() => handlePageChange(pageNum)}
-                          className={`px-3 py-1 border rounded text-sm ${
-                            pageNum === pagination.currentPage
-                              ? 'bg-blue-500 text-white border-blue-500'
-                              : 'border-gray-300 hover:bg-gray-100'
-                          }`}
                         >
                           {pageNum}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
 
                   {/* Next Page */}
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(pagination.currentPage + 1)}
                     disabled={!pagination.hasMore}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                   >
                     Next
-                  </button>
+                  </Button>
 
                   {/* Last Page */}
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(pagination.totalPages)}
                     disabled={!pagination.hasMore}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
                   >
                     Last
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </div>
