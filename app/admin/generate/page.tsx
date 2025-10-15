@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Link from 'next/link';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, QrCode, Download, FileDown, Eye, EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { QrCode, Download, FileDown, Eye, EyeOff, Settings } from 'lucide-react';
+import AdminLayout from '@/components/admin-layout';
 
 interface GeneratedTicket {
   ticketId: number;
@@ -25,10 +26,13 @@ interface GenerationResult {
 
 export default function GenerateTicketsPage() {
   const [eventId, setEventId] = useState<number>(1);
-  const [ticketUpTo, setTicketUpTo] = useState<number>(100);
+  const [ticketFrom, setTicketFrom] = useState<number>(1);
+  const [ticketTo, setTicketTo] = useState<number>(100);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string>('');
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   
   // QR Code customization - default to A-one format
   const [qrSize, setQrSize] = useState<number>(20); // mm - optimized for A-one labels
@@ -117,7 +121,8 @@ export default function GenerateTicketsPage() {
         },
         body: JSON.stringify({
           eventId,
-          ticketUpTo,
+          ticketFrom,
+          ticketTo,
         }),
       });
 
@@ -143,7 +148,7 @@ export default function GenerateTicketsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tickets-event${eventId}-1-${ticketUpTo}.csv`;
+    a.download = `tickets-event${eventId}-${ticketFrom}-${ticketTo}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -154,7 +159,7 @@ export default function GenerateTicketsPage() {
     if (!result) return;
 
     try {
-      setIsGenerating(true);
+      setIsGeneratingPDF(true);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const dimensions = calculateTicketDimensions();
@@ -196,6 +201,17 @@ export default function GenerateTicketsPage() {
         // Generate QR code for this ticket
         const qrDataUrl = await generateQRCode(ticket.qrUrl);
         
+        // Update progress every 25 tickets or on last ticket for better performance
+        if (i % 25 === 0 || i === result.tickets.length - 1) {
+          const progress = Math.round(((i + 1) / result.tickets.length) * 100);
+          console.log(`PDF Generation Progress: ${progress}% (${i + 1}/${result.tickets.length} tickets)`);
+          
+          // Small delay every 50 tickets to prevent UI blocking
+          if (i % 50 === 0 && i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+        
         // Draw border
         pdf.rect(x + 2, y + 2, cellWidth - 4, cellHeight - 4);
         
@@ -214,42 +230,30 @@ export default function GenerateTicketsPage() {
       }
       
       // Save the PDF
-      pdf.save(`qr-tickets-event${eventId}-1-${ticketUpTo}.pdf`);
+      pdf.save(`qr-tickets-event${eventId}-${ticketFrom}-${ticketTo}.pdf`);
       
     } catch (error) {
       console.error('PDF generation error:', error);
       setError('Failed to generate PDF');
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingPDF(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
+    <AdminLayout>
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="w-6 h-6" />
-                  Generate QR Tickets
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Generate QR codes for event tickets using the hashids algorithm. 
-                  Specify event ID and maximum ticket number to generate.
-                </p>
-              </div>
-              <Button variant="ghost" asChild>
-                <Link href="/admin">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Admin
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <QrCode className="w-8 h-8" />
+            Generate QR Tickets
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Generate QR codes for event tickets using the hashids algorithm. 
+            Specify event ID and ticket range (maximum 520 tickets per generation to prevent memory issues).
+          </p>
+        </div>
 
         {/* Generation Form */}
         <Card className="mb-6">
@@ -257,7 +261,7 @@ export default function GenerateTicketsPage() {
             <CardTitle>Generation Parameters</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="grid md:grid-cols-3 gap-6 mb-6">
               <div className="space-y-2">
                 <Label htmlFor="eventId">Event ID</Label>
                 <Input
@@ -274,25 +278,91 @@ export default function GenerateTicketsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ticketUpTo">Tickets Up To</Label>
+                <Label htmlFor="ticketFrom">Ticket From</Label>
                 <Input
-                  id="ticketUpTo"
+                  id="ticketFrom"
                   type="number"
                   min="1"
-                  max="10000"
-                  value={ticketUpTo}
-                  onChange={(e) => setTicketUpTo(parseInt(e.target.value) || 1)}
-                  placeholder="Maximum ticket number"
+                  value={ticketFrom}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    setTicketFrom(value);
+                    // Ensure ticketTo is at least ticketFrom
+                    if (ticketTo < value) {
+                      setTicketTo(value);
+                    }
+                  }}
+                  placeholder="Start ticket number"
                 />
                 <p className="text-sm text-muted-foreground">
-                  Generate tickets from 1 to this number
+                  Starting ticket number
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ticketTo">Ticket To</Label>
+                <Input
+                  id="ticketTo"
+                  type="number"
+                  min={ticketFrom}
+                  value={ticketTo}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || ticketFrom;
+                    setTicketTo(Math.max(value, ticketFrom));
+                  }}
+                  placeholder="End ticket number"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Ending ticket number
+                </p>
+              </div>
+            </div>
+
+            {/* Validation Messages */}
+            {(ticketTo - ticketFrom + 1) > 520 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-destructive flex items-center justify-center">
+                    <span className="text-destructive-foreground text-xs">!</span>
+                  </div>
+                  <p className="text-destructive font-medium">
+                    Maximum 520 tickets per generation allowed
+                  </p>
+                </div>
+                <p className="text-sm text-destructive/80 mt-1">
+                  Currently trying to generate {ticketTo - ticketFrom + 1} tickets. 
+                  Please reduce the range to prevent memory issues and page unresponsiveness.
+                </p>
+              </div>
+            )}
+
+            {ticketTo < ticketFrom && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-4">
+                <p className="text-destructive">
+                  "Ticket To" must be greater than or equal to "Ticket From"
+                </p>
+              </div>
+            )}
+
+            <div className="bg-muted/50 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Tickets to generate:</span>
+                <span className="font-bold text-primary">{Math.max(0, ticketTo - ticketFrom + 1)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span>Range:</span>
+                <span className="font-mono">{ticketFrom} - {ticketTo}</span>
               </div>
             </div>
 
             <Button
               onClick={generateTickets}
-              disabled={isGenerating || ticketUpTo < 1 || eventId < 1}
+              disabled={
+                isGenerating || 
+                ticketTo < ticketFrom || 
+                eventId < 1 || 
+                (ticketTo - ticketFrom + 1) > 520
+              }
               className="w-full"
             >
               {isGenerating ? (
@@ -301,7 +371,7 @@ export default function GenerateTicketsPage() {
                   Generating...
                 </span>
               ) : (
-                `Generate ${ticketUpTo} Tickets`
+                `Generate ${ticketTo - ticketFrom + 1} Tickets`
               )}
             </Button>
           </CardContent>
@@ -312,32 +382,48 @@ export default function GenerateTicketsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>QR Code & Layout Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  PDF Layout & QR Settings
+                </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
                   🏷️ Default: A-one 40面 format - QR code + padded ticket number (00001, 00002...)
                 </p>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowPreview(!showPreview);
-                  if (!showPreview) {
-                    generatePreviewQR();
-                  }
-                }}
-              >
-                {showPreview ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide Preview
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Show Preview
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="advanced-mode"
+                    checked={showAdvanced}
+                    onCheckedChange={setShowAdvanced}
+                  />
+                  <Label htmlFor="advanced-mode" className="text-sm">
+                    Advanced Options
+                  </Label>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowPreview(!showPreview);
+                    if (!showPreview) {
+                      generatePreviewQR();
+                    }
+                  }}
+                >
+                  {showPreview ? (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      Hide Preview
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Show Preview
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -345,7 +431,34 @@ export default function GenerateTicketsPage() {
           <div className="grid md:grid-cols-2 gap-8">
             {/* Settings Panel */}
             <div className="space-y-6">
-              {/* QR Code Size */}
+              {!showAdvanced && (
+                <div className="bg-muted/50 border rounded-lg p-4">
+                  <h3 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                    🏷️ Quick Setup - A-one Compatible
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Ready to generate professional label sheets compatible with A-one 40面 format (4×10 grid, 52.5×29.7mm labels).
+                  </p>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span>QR Code Size:</span>
+                      <span className="font-medium">{qrSize}mm</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Grid Layout:</span>
+                      <span className="font-medium">{gridCols}×{gridRows} ({calculateTicketDimensions().ticketsPerPage} per page)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Pages Needed:</span>
+                      <span className="font-medium">{Math.ceil((ticketTo - ticketFrom + 1) / calculateTicketDimensions().ticketsPerPage)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showAdvanced && (
+                <>
+                  {/* QR Code Size */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   QR Code Size: {qrSize}mm × {qrSize}mm
@@ -534,9 +647,11 @@ export default function GenerateTicketsPage() {
                     <div className="text-blue-600 font-medium">✓ Compatible with A-one 40面 label sheets (80322)</div>
                   )}
                   <div>QR Code: {qrSize}mm × {qrSize}mm</div>
-                  <div>Pages needed: {Math.ceil(ticketUpTo / calculateTicketDimensions().ticketsPerPage)}</div>
+                  <div>Pages needed: {Math.ceil((ticketTo - ticketFrom + 1) / calculateTicketDimensions().ticketsPerPage)}</div>
                 </div>
-              </div>
+                </div>
+                </>
+              )}
             </div>
 
             {/* Preview Panel */}
@@ -654,24 +769,38 @@ export default function GenerateTicketsPage() {
                   <div className="text-sm text-gray-600">Event ID</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-md text-center">
-                  <div className="text-2xl font-bold text-purple-600">1-{ticketUpTo}</div>
+                  <div className="text-2xl font-bold text-purple-600">{ticketFrom}-{ticketTo}</div>
                   <div className="text-sm text-gray-600">Ticket Range</div>
                 </div>
               </div>
 
               <div className="flex gap-4">
-                <button
+                <Button
                   onClick={downloadCSV}
-                  className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
                 >
-                  📄 Download CSV
-                </button>
-                <button
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Download CSV
+                </Button>
+                <Button
                   onClick={generatePDF}
-                  className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+                  disabled={isGeneratingPDF}
+                  variant="default"
+                  className="bg-purple-600 hover:bg-purple-700"
                 >
-                  📄 Generate PDF Grid
-                </button>
+                  {isGeneratingPDF ? (
+                    <>
+                      <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Generate PDF Grid
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
 
@@ -719,6 +848,6 @@ export default function GenerateTicketsPage() {
         {/* Hidden canvas for QR generation */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
-    </div>
+    </AdminLayout>
   );
 }

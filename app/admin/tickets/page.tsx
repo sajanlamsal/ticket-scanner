@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import AdminLayout from '@/components/admin-layout';
 
 interface Ticket {
   id: number;
@@ -36,7 +37,7 @@ export default function AdminTickets() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<string>('all'); // 'all', 'entered', 'not-entered'
   const [search, setSearch] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Authentication is now handled by AdminLayout
   const [pagination, setPagination] = useState<PaginationInfo>({
     limit: 100,
     offset: 0,
@@ -49,12 +50,6 @@ export default function AdminTickets() {
   const [rowsPerPage, setRowsPerPage] = useState(100);
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      window.location.href = '/admin/login';
-      return;
-    }
-    setIsAuthenticated(true);
     fetchTickets();
   }, [filter, search, pagination.offset, rowsPerPage]);
 
@@ -98,10 +93,7 @@ export default function AdminTickets() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    window.location.href = '/admin/login';
-  };
+  // Layout handles auth and logout, so we can remove these handlers
 
   const handlePageChange = (newPage: number) => {
     const newOffset = (newPage - 1) * rowsPerPage;
@@ -123,30 +115,20 @@ export default function AdminTickets() {
     setPagination(prev => ({ ...prev, offset: 0 })); // Reset to first page when searching
   };
 
-  if (!isAuthenticated) {
-    return null; // Will redirect to login
-  }
-
   return (
-    <div className="container mx-auto p-4">
-      <div className="max-w-6xl mx-auto">
+    <AdminLayout>
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Ticket Management</h1>
-          <div className="space-x-4">
-            <Button asChild>
-              <a href="/admin/scanner">
-                QR Scanner
-              </a>
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={handleLogout}
-              className="text-red-600 hover:text-red-800"
-            >
-              Logout
-            </Button>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Ticket Management</h1>
+            <p className="text-muted-foreground mt-1">View and manage all event tickets</p>
           </div>
+          <Button asChild>
+            <a href="/admin/scanner">
+              QR Scanner
+            </a>
+          </Button>
         </div>
 
         {/* Filters */}
@@ -385,6 +367,6 @@ export default function AdminTickets() {
           </Card>
         )}
       </div>
-    </div>
+    </AdminLayout>
   );
 }

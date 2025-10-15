@@ -1,61 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QrCode, FileText, Plus, Shield, Smartphone, Database, BarChart } from 'lucide-react';
+import AdminLayout from '@/components/admin-layout';
 
 export default function AdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      router.push('/admin/login');
-      return;
-    }
-    setIsAuthenticated(true);
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    router.push('/admin/login');
-  };
-
-  if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                <p className="text-muted-foreground mt-2">Nepathya Ticket Management System</p>
-              </div>
-              <Button 
-                variant="destructive" 
-                onClick={handleLogout}
-              >
-                Logout
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+    <AdminLayout>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Welcome Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Welcome to Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-2">Manage your events, tickets, and attendees efficiently</p>
+        </div>
 
         {/* Main Actions Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -158,10 +117,10 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-muted-foreground text-sm">
+        <div className="text-center text-muted-foreground text-sm">
           <p>Nepathya Ticket System - Event Management Platform</p>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

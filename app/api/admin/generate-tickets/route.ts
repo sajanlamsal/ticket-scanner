@@ -5,7 +5,8 @@ import { getDB } from '@/lib/database';
 
 interface GenerateRequest {
   eventId: number;
-  ticketUpTo: number;
+  ticketFrom: number;
+  ticketTo: number;
 }
 
 interface GeneratedTicket {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     const auth = requireAuth(request);
     
     const body = await request.json();
-    let { eventId, ticketUpTo }: GenerateRequest = body;
+    let { eventId, ticketFrom, ticketTo }: GenerateRequest = body;
 
     // Validation
     if (!eventId || eventId < 1) {
@@ -31,9 +32,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!ticketUpTo || ticketUpTo < 1 || ticketUpTo > 10000) {
+    if (!ticketFrom || ticketFrom < 1) {
       return NextResponse.json(
-        { error: 'Ticket count must be between 1 and 10000' },
+        { error: 'Valid ticket from number is required (>= 1)' },
+        { status: 400 }
+      );
+    }
+
+    if (!ticketTo || ticketTo < ticketFrom) {
+      return NextResponse.json(
+        { error: 'Ticket to must be greater than or equal to ticket from' },
+        { status: 400 }
+      );
+    }
+
+    const ticketCount = ticketTo - ticketFrom + 1;
+    if (ticketCount > 520) {
+      return NextResponse.json(
+        { error: 'Maximum 520 tickets can be generated at once to prevent memory issues' },
         { status: 400 }
       );
     }
@@ -75,7 +91,7 @@ export async function POST(request: NextRequest) {
     const tickets: GeneratedTicket[] = [];
     const csvLines = ['ticketId,eventId,token,qrUrl'];
 
-    for (let ticketId = 1; ticketId <= ticketUpTo; ticketId++) {
+    for (let ticketId = ticketFrom; ticketId <= ticketTo; ticketId++) {
       // Generate token using our hashids algorithm
       const token = generateToken(ticketId, eventId);
       const qrUrl = `${baseUrl}/entry/${token}`;
@@ -101,7 +117,7 @@ export async function POST(request: NextRequest) {
       csvContent,
       totalGenerated: tickets.length,
       eventId,
-      ticketRange: `1-${ticketUpTo}`,
+      ticketRange: `${ticketFrom}-${ticketTo}`,
       message: `Successfully generated ${tickets.length} ticket tokens for event ${eventId} (database entries created on-demand)`,
     });
 
