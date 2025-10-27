@@ -109,7 +109,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     try {
       // Decode JWT to get user info (basic decode, not verifying signature)
       const payload = JSON.parse(atob(token.split('.')[1]));
-      setUser({ username: payload.username || 'Admin' });
+      
+      // Check if token is expired
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.log('Token expired');
+        localStorage.removeItem('adminToken');
+        router.push('/admin/login');
+        return;
+      }
+      
+      // Use email from token payload (matches the JWT structure from login API)
+      setUser({ username: payload.email || payload.username || 'Admin' });
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Invalid token:', error);
