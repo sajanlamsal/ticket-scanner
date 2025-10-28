@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -770,12 +771,12 @@ export default function GenerateTicketsPage() {
                           }}
                         >
                           <div style={{ marginTop: `${qrTopMargin * 3}px` }}>
-                            <img 
+                            <Image 
                               src={previewQR} 
                               alt="QR Preview" 
+                              width={qrSize * 3}
+                              height={qrSize * 3}
                               style={{ 
-                                width: `${qrSize * 3}px`, 
-                                height: `${qrSize * 3}px`,
                                 display: 'block',
                                 margin: '0 auto'
                               }}
@@ -951,7 +952,7 @@ export default function GenerateTicketsPage() {
                     <div><strong>3. Margins:</strong> Use printer default margins (4.23mm) - already optimized</div>
                     <div><strong>4. Quality:</strong> High quality mode for crisp QR codes</div>
                     <div><strong>5. Paper Type:</strong> A-one or UNIPACK 40面 label sheets (52.5×29.7mm)</div>
-                    <div><strong>6. Perfect Alignment:</strong> Labels will align automatically with Canon's default margins</div>
+                    <div><strong>6. Perfect Alignment:</strong> Labels will align automatically with Canon&apos;s default margins</div>
                   </div>
                 </div>
               </div>

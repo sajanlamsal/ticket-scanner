@@ -168,7 +168,7 @@ export default function ScannerPage() {
       setIsProcessing(false);
       processingUrlRef.current = '';
     }
-  }, []); // No dependencies to prevent recreation
+  }, [isProcessing, scanMemory]); // Include dependencies
 
   // Scanner initialization with auto permission handling
   useEffect(() => {
@@ -296,7 +296,7 @@ export default function ScannerPage() {
         existingElements.forEach(el => el.remove());
       }, 100);
     };
-  }, [router]);
+  }, [router, handleScanSuccess]);
 
   // Auto-clear results after 6 seconds
   useEffect(() => {

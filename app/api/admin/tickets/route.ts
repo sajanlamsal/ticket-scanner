@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/database';
 import { requireAuth } from '@/lib/auth';
 
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   try {
     // Authenticate admin

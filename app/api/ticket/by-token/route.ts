@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/database';
 import { decodeToken } from '@/lib/tokens';
 
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);

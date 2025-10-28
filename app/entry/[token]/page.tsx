@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,11 +31,7 @@ export default function EntryPage({ params }: { params: { token: string } }) {
   const [updating, setUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
-  useEffect(() => {
-    fetchTicketInfo();
-  }, []);
-
-  const fetchTicketInfo = async () => {
+  const fetchTicketInfo = useCallback(async () => {
     try {
       const response = await fetch(`/api/ticket/by-token?token=${params.token}`);
       
@@ -55,7 +51,11 @@ export default function EntryPage({ params }: { params: { token: string } }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.token]);
+
+  useEffect(() => {
+    fetchTicketInfo();
+  }, [fetchTicketInfo]);
 
   const handleUpdateAttendee = async (e: FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,11 +49,7 @@ export default function AdminTickets() {
   });
   const [rowsPerPage, setRowsPerPage] = useState(100);
 
-  useEffect(() => {
-    fetchTickets();
-  }, [filter, search, pagination.offset, rowsPerPage]);
-
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -91,7 +87,11 @@ export default function AdminTickets() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, search, pagination.offset, rowsPerPage]);
+
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
 
   // Layout handles auth and logout, so we can remove these handlers
 
