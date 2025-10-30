@@ -31,28 +31,6 @@ export default function ScannerPage() {
   const [scanMemory, setScanMemory] = useState<ScanMemory | null>(null);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
-  // Initial cleanup effect - runs once on mount
-  useEffect(() => {
-    console.log('Component mounted - performing initial cleanup');
-    
-    // Clean up any leftover HTML5-QRCode elements from previous instances
-    const cleanupExistingElements = () => {
-      const container = document.getElementById('qr-scanner-container');
-      if (container) {
-        container.innerHTML = '';
-      }
-      
-      // Remove any orphaned video/canvas elements
-      const orphanedElements = document.querySelectorAll('video[id*="qr"], canvas[id*="qr"], video[style*="qr"], canvas[style*="qr"]');
-      orphanedElements.forEach(el => {
-        console.log('Removing orphaned element:', el);
-        el.remove();
-      });
-    };
-    
-    cleanupExistingElements();
-  }, []);
-  
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const lastScanTimeRef = useRef<number>(0);
   const processingUrlRef = useRef<string>('');
@@ -60,42 +38,61 @@ export default function ScannerPage() {
   const initializingRef = useRef<boolean>(false);
   const router = useRouter();
 
+  // Initial cleanup effect - runs once on mount
+  useEffect(() => {
+    const cleanupExistingElements = () => {
+      const container = document.getElementById('qr-scanner-container');
+      if (container) {
+        container.innerHTML = '';
+      }
+      
+      const orphanedElements = document.querySelectorAll('video[id*="qr"], canvas[id*="qr"], video[style*="qr"], canvas[style*="qr"]');
+      orphanedElements.forEach(el => {
+        try {
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        } catch (e) {
+          // Ignore
+        }
+      });
+    };
+    
+    cleanupExistingElements();
+  }, []);
+
   // Check camera permissions
   const checkCameraPermission = async (): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
-      // Stop the stream immediately, we just wanted to check permission
       stream.getTracks().forEach(track => track.stop());
       return true;
     } catch (error) {
-      console.log('Camera permission denied or not available:', error);
       return false;
     }
   };
 
-  // Throttled scan handler to prevent spam
-  const handleScanSuccess = useCallback(async (scannedText: string) => {
+  // Use ref to store the scan handler - prevents infinite loops
+  const handleScanSuccessRef = useRef<(scannedText: string) => Promise<void>>();
+  
+  handleScanSuccessRef.current = async (scannedText: string) => {
     const now = Date.now();
     
-    // Get current values from refs/state to avoid stale closures
-    const currentMemory = scanMemory;
-    const currentProcessing = isProcessing;
-    
     // 1. Rate limiting - prevent spam (max 1 scan per 500ms for new URLs)
-    if (scannedText !== currentMemory?.url && now - lastScanTimeRef.current < 500) {
+    if (scannedText !== scanMemory?.url && now - lastScanTimeRef.current < 500) {
       return;
     }
     
     // 2. Prevent duplicate processing
-    if (currentProcessing && processingUrlRef.current === scannedText) {
+    if (isProcessing && processingUrlRef.current === scannedText) {
       return;
     }
 
     // 3. Handle memorized scans (instant feedback)
-    if (currentMemory?.url === scannedText) {
-      setCurrentResult(currentMemory.result);
+    if (scanMemory?.url === scannedText) {
+      setCurrentResult(scanMemory.result);
       return;
     }
 
@@ -168,11 +165,17 @@ export default function ScannerPage() {
       setIsProcessing(false);
       processingUrlRef.current = '';
     }
-  }, [isProcessing, scanMemory]); // Include dependencies
+  };
 
-  // Scanner initialization with auto permission handling
+  // Stable callback wrapper for manual entry
+  const handleScanSuccess = useCallback(async (scannedText: string) => {
+    if (handleScanSuccessRef.current) {
+      await handleScanSuccessRef.current(scannedText);
+    }
+  }, []);
+
+  // Scanner initialization
   useEffect(() => {
-    // Mark component as mounted
     isMountedRef.current = true;
 
     const token = localStorage.getItem('adminToken');
@@ -182,23 +185,23 @@ export default function ScannerPage() {
     }
 
     const initializeScanner = async () => {
-      // Prevent multiple initializations with multiple checks
       if (initializingRef.current || scannerRef.current || !isMountedRef.current) {
-        console.log('Scanner initialization blocked - already initializing, exists, or unmounted');
         return;
       }
 
       initializingRef.current = true;
-      console.log('Starting scanner initialization...');
 
       try {
         // Force clear any existing HTML5-QRCode instances
         const existingElements = document.querySelectorAll('#qr-scanner-container video, #qr-scanner-container canvas');
-        existingElements.forEach(el => el.remove());
+        existingElements.forEach(el => {
+          try {
+            if (el.parentNode) el.parentNode.removeChild(el);
+          } catch (e) { /* ignore */ }
+        });
 
         setScannerError('');
         
-        // Clear container completely
         const container = document.getElementById('qr-scanner-container');
         if (container) {
           container.innerHTML = '';
@@ -213,25 +216,29 @@ export default function ScannerPage() {
           return;
         }
 
-        // Wait for DOM to be ready and ensure component is still mounted
+        // Wait for DOM to be ready
         await new Promise(resolve => setTimeout(resolve, 200));
         
         if (!isMountedRef.current) {
-          console.log('Component unmounted during initialization, aborting');
           return;
         }
 
-        // Initialize scanner with proper configuration
+        // Calculate responsive qrbox size based on container width
+        const containerElement = document.getElementById('qr-scanner-container');
+        const containerWidth = containerElement?.clientWidth || 400;
+        // Use 70% of container width, capped between 200px and 400px
+        const qrboxSize = Math.min(400, Math.max(200, Math.floor(containerWidth * 0.7)));
+
+        // Initialize scanner
         const config = {
-          fps: 5,
-          qrbox: { width: 550, height: 550 },
+          fps: 10,
+          qrbox: qrboxSize, // Use calculated size for both width and height
           aspectRatio: 1.0,
           rememberLastUsedCamera: true,
           showTorchButtonIfSupported: true,
           disableFlip: false,
         };
 
-        console.log('Creating Html5QrcodeScanner instance...');
         scannerRef.current = new Html5QrcodeScanner(
           'qr-scanner-container',
           config,
@@ -239,25 +246,59 @@ export default function ScannerPage() {
         );
 
         if (!isMountedRef.current || !scannerRef.current) {
-          console.log('Component unmounted or scanner creation failed, aborting');
           return;
         }
 
-        // Render scanner with proper error handling
-        await scannerRef.current.render(
-          handleScanSuccess,
+        // Render scanner - use ref directly to avoid closure issues
+        scannerRef.current.render(
+          (decodedText) => {
+            if (handleScanSuccessRef.current) {
+              handleScanSuccessRef.current(decodedText);
+            }
+          },
           (error) => {
             // Only log actual errors, not normal scanning behavior
-            if (error && !error.includes('NotFoundException')) {
-              console.warn('QR scan error (non-critical):', error);
+            if (error && 
+                !error.includes('NotFoundException') && 
+                !error.includes('No barcode or QR code detected')) {
+              console.warn('QR scan error:', error);
             }
           }
         );
 
+        // Auto-click permission button if needed
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        let attempts = 0;
+        const maxAttempts = 20;
+        let videoElement = null;
+        
+        while (!videoElement && attempts < maxAttempts && isMountedRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          
+          videoElement = document.querySelector('#qr-scanner-container video');
+          const permissionBtn = document.querySelector('#html5-qrcode-button-camera-permission');
+          const startBtn = document.querySelector('#html5-qrcode-button-camera-start');
+          
+          attempts++;
+          
+          // Auto-click permission button
+          if (permissionBtn && !videoElement) {
+            (permissionBtn as HTMLElement).click();
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            continue;
+          }
+          
+          // Auto-click start button
+          if (startBtn && !videoElement) {
+            (startBtn as HTMLElement).click();
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
+        }
+
         if (isMountedRef.current) {
           setScannerReady(true);
           setPermissionGranted(true);
-          console.log('Scanner initialized successfully');
         }
         
       } catch (error) {
@@ -271,32 +312,32 @@ export default function ScannerPage() {
       }
     };
 
-    // Small delay to ensure DOM is ready
     const timeoutId = setTimeout(initializeScanner, 100);
 
     return () => {
-      console.log('Cleanup function called');
       isMountedRef.current = false;
       initializingRef.current = false;
       clearTimeout(timeoutId);
       
       if (scannerRef.current) {
-        console.log('Cleaning up scanner...');
         scannerRef.current.clear().catch(() => {});
         scannerRef.current = null;
       }
       
-      // Force cleanup of any HTML5-QRCode elements
       setTimeout(() => {
         const container = document.getElementById('qr-scanner-container');
         if (container) {
           container.innerHTML = '';
         }
         const existingElements = document.querySelectorAll('video[id*="qr"], canvas[id*="qr"]');
-        existingElements.forEach(el => el.remove());
+        existingElements.forEach(el => {
+          try {
+            if (el.parentNode) el.parentNode.removeChild(el);
+          } catch (e) { /* ignore */ }
+        });
       }, 100);
     };
-  }, [router, handleScanSuccess]);
+  }, [router]); // ONLY router - no handleScanSuccess to prevent infinite loop
 
   // Auto-clear results after 6 seconds
   useEffect(() => {
@@ -319,19 +360,16 @@ export default function ScannerPage() {
     setScannerReady(false);
     setPermissionGranted(null);
     
-    // Clear existing scanner completely
     if (scannerRef.current) {
       await scannerRef.current.clear().catch(() => {});
       scannerRef.current = null;
     }
     
-    // Clear container
     const container = document.getElementById('qr-scanner-container');
     if (container) {
       container.innerHTML = '';
     }
     
-    // Reinitialize after a short delay
     setTimeout(() => {
       window.location.reload();
     }, 100);
@@ -358,27 +396,36 @@ export default function ScannerPage() {
                 <Button
                   onClick={() => router.push('/admin/tickets')}
                   size="sm"
+                  className="hidden sm:flex"
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Tickets
                 </Button>
+                <Button
+                  onClick={() => router.push('/admin/tickets')}
+                  size="sm"
+                  className="sm:hidden"
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 sm:px-6">
 
             {/* Scanner Status */}
             <div className="mb-4">
               {scannerError ? (
-                <div className="flex items-center justify-between bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-destructive/10 border border-destructive/20 rounded-lg p-3 gap-2">
                   <div className="flex items-center gap-2 text-destructive">
-                    <AlertCircle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span className="text-sm">{scannerError}</span>
                   </div>
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={retryCamera}
+                    className="w-full sm:w-auto"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Retry
@@ -388,20 +435,22 @@ export default function ScannerPage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="animate-pulse">
                     <Clock className="w-3 h-3 mr-1" />
-                    {permissionGranted === null ? 'Requesting camera access...' : 
-                     permissionGranted === false ? 'Camera access denied' :
-                     'Starting camera...'}
+                    <span className="text-xs sm:text-sm">
+                      {permissionGranted === null ? 'Requesting camera access...' : 
+                       permissionGranted === false ? 'Camera access denied' :
+                       'Starting camera...'}
+                    </span>
                   </Badge>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
                     <CheckCircle className="w-3 h-3 mr-1" />
-                    Camera ready • Point at QR code
+                    <span className="text-xs sm:text-sm">Camera ready • Point at QR code</span>
                   </Badge>
                   {isProcessing && (
                     <Badge variant="secondary" className="animate-pulse">
-                      Processing...
+                      <span className="text-xs sm:text-sm">Processing...</span>
                     </Badge>
                   )}
                 </div>
@@ -410,20 +459,20 @@ export default function ScannerPage() {
 
             {/* Scanner Container */}
             <div className="border rounded-lg overflow-hidden bg-muted/50">
-              <div id="qr-scanner-container" className="min-h-[400px]" />
+              <div id="qr-scanner-container" className="min-h-[300px] sm:min-h-[400px]" />
             </div>
 
             {/* Result Display - Fixed position, no flickering */}
-            <div className="mt-4 h-32">
+            <div className="mt-4 min-h-[80px] sm:min-h-[128px]">
               {currentResult && (
                 <Card className={`transition-all duration-300 ease-in-out ${
                   currentResult.type === 'success' ? 'border-green-200 bg-green-50/50' :
                   currentResult.type === 'warning' ? 'border-yellow-200 bg-yellow-50/50' :
                   'border-destructive/20 bg-destructive/5'
                 }`}>
-                  <CardContent className="p-4">
-                    <h3 className="font-bold text-lg mb-1">{currentResult.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-2">{currentResult.message}</p>
+                  <CardContent className="p-3 sm:p-4">
+                    <h3 className="font-bold text-base sm:text-lg mb-1">{currentResult.title}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">{currentResult.message}</p>
                     
                     {currentResult.details && (
                       <div className="text-xs space-y-1 text-muted-foreground">
