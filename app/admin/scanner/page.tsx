@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Camera, FileText, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Camera, FileText, RefreshCw, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 
 interface ScanResult {
   type: 'success' | 'error' | 'warning';
@@ -223,20 +223,31 @@ export default function ScannerPage() {
           return;
         }
 
-        // Calculate responsive qrbox size based on container width
+        // Calculate responsive qrbox size - make it cover entire area on mobile
         const containerElement = document.getElementById('qr-scanner-container');
         const containerWidth = containerElement?.clientWidth || 400;
-        // Use 70% of container width, capped between 200px and 400px
-        const qrboxSize = Math.min(400, Math.max(200, Math.floor(containerWidth * 0.7)));
+        const isMobile = window.innerWidth < 640;
+        
+        // On mobile: use 95% of container width to maximize scan area
+        // On desktop: use 70% for comfortable scanning
+        const qrboxSize = isMobile 
+          ? Math.floor(containerWidth * 0.95) 
+          : Math.min(400, Math.max(200, Math.floor(containerWidth * 0.7)));
 
-        // Initialize scanner
+        // Initialize scanner with mobile-optimized config
         const config = {
           fps: 10,
-          qrbox: qrboxSize, // Use calculated size for both width and height
+          qrbox: qrboxSize,
           aspectRatio: 1.0,
           rememberLastUsedCamera: true,
           showTorchButtonIfSupported: true,
           disableFlip: false,
+          videoConstraints: {
+            facingMode: 'environment',
+            // Use lower resolution on mobile to fit better in reduced height
+            width: { ideal: isMobile ? 640 : 1280 },
+            height: { ideal: isMobile ? 480 : 720 }
+          }
         };
 
         scannerRef.current = new Html5QrcodeScanner(
@@ -268,6 +279,47 @@ export default function ScannerPage() {
 
         // Auto-click permission button if needed
         await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Add CSS to optimize mobile scanner layout
+        const style = document.createElement('style');
+        style.id = 'qr-scanner-mobile-styles';
+        style.textContent = `
+          @media (max-width: 640px) {
+            /* Make video fill container on mobile */
+            #qr-scanner-container video {
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: cover !important;
+            }
+            
+            /* Remove extra padding/margins on mobile */
+            #qr-scanner-container > div {
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            
+            /* Thin scan box border on mobile */
+            #qr-scanner-container canvas {
+              border-width: 3px !important;
+            }
+            
+            /* Hide library's default footer on mobile to save space */
+            #qr-scanner-container__dashboard_section_csr {
+              display: none !important;
+            }
+          }
+          
+          /* Ensure container respects height constraints */
+          #qr-scanner-container {
+            display: flex !important;
+            flex-direction: column !important;
+          }
+        `;
+        
+        // Remove old style if exists and add new one
+        const oldStyle = document.getElementById('qr-scanner-mobile-styles');
+        if (oldStyle) oldStyle.remove();
+        document.head.appendChild(style);
         
         let attempts = 0;
         const maxAttempts = 20;
@@ -323,6 +375,10 @@ export default function ScannerPage() {
         scannerRef.current.clear().catch(() => {});
         scannerRef.current = null;
       }
+      
+      // Remove mobile styles on cleanup
+      const mobileStyles = document.getElementById('qr-scanner-mobile-styles');
+      if (mobileStyles) mobileStyles.remove();
       
       setTimeout(() => {
         const container = document.getElementById('qr-scanner-container');
@@ -457,9 +513,18 @@ export default function ScannerPage() {
               )}
             </div>
 
-            {/* Scanner Container */}
-            <div className="border rounded-lg overflow-hidden bg-muted/50">
-              <div id="qr-scanner-container" className="min-h-[300px] sm:min-h-[400px]" />
+            {/* Scanner Container with Loading Overlay - Half height on mobile */}
+            <div className="border rounded-lg overflow-hidden bg-muted/50 relative">
+              <div id="qr-scanner-container" className="min-h-[200px] max-h-[250px] sm:min-h-[400px] sm:max-h-none" />
+              
+              {/* Loading Overlay - Shows when processing */}
+              {isProcessing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
+                  <div className="bg-white rounded-full p-3 sm:p-4 shadow-lg">
+                    <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-primary" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Result Display - Fixed position, no flickering */}
