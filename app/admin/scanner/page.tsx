@@ -74,43 +74,109 @@ export default function ScannerPage() {
     }
   };
 
+  // Audio feedback function
+  const playSuccessChime = useCallback(() => {
+    try {
+      // Create a simple success chime using Web Audio API
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Pleasant success tone (C major chord)
+      oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+      oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+      oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+      
+      oscillator.type = 'sine';
+      
+      // Fade in and out
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.4);
+      
+      // Clean up
+      setTimeout(() => {
+        try {
+          audioContext.close();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }, 500);
+    } catch (error) {
+      // Silently fail if audio context not supported
+      console.debug('Audio chime not supported:', error);
+    }
+  }, []);
+
   // Use ref to store the scan handler - prevents infinite loops
   const handleScanSuccessRef = useRef<(scannedText: string) => Promise<void>>();
   
   handleScanSuccessRef.current = async (scannedText: string) => {
     const now = Date.now();
+    console.log('🔍 Scan initiated:', { scannedText, timestamp: now });
     
     // 1. Rate limiting - prevent spam (max 1 scan per 500ms for new URLs)
     if (scannedText !== scanMemory?.url && now - lastScanTimeRef.current < 500) {
+      console.log('⏳ Rate limited, skipping scan');
       return;
     }
     
     // 2. Prevent duplicate processing
     if (isProcessing && processingUrlRef.current === scannedText) {
+      console.log('🔄 Already processing this URL, skipping');
       return;
     }
 
     // 3. Handle memorized scans (instant feedback)
     if (scanMemory?.url === scannedText) {
+      console.log('💾 Found in memory, using cached result:', scanMemory.result);
       setCurrentResult(scanMemory.result);
       return;
     }
 
     // 4. Process new scan
+    console.log('🆕 Processing new scan');
     lastScanTimeRef.current = now;
     processingUrlRef.current = scannedText;
     setIsProcessing(true);
     setCurrentResult(null);
 
     try {
-      // Validate token format first (instant)
-      const validation = validateAndExtractToken(scannedText);
+      // Extract token from URL or use as-is if already a token
+      console.log('🔍 Extracting token from scanned text...');
+      let token = scannedText.trim();
+      
+      // Check if it's a URL and extract the token part
+      try {
+        const url = new URL(scannedText);
+        const pathParts = url.pathname.split('/');
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.length > 0) {
+          token = lastPart;
+          console.log('📎 Extracted token from URL:', token);
+        }
+      } catch (urlError) {
+        // Not a URL, treat as direct token
+        console.log('📝 Using scanned text as direct token');
+      }
+
+      // Validate token format
+      console.log('🔍 Validating token format for:', token);
+      const validation = validateAndExtractToken(token);
+      console.log('✅ Token validation result:', validation);
       
       if (!validation.isValid) {
+        console.log('❌ Token format invalid');
         const errorResult: ScanResult = {
           type: 'error',
           title: '❌ Invalid Ticket',
-          message: `Scanned: ${scannedText}`
+          message: `Invalid token: ${token}`
         };
         
         setScanMemory({ url: scannedText, result: errorResult, timestamp: now });
@@ -121,17 +187,35 @@ export default function ScannerPage() {
       }
 
       // Server validation
+      console.log('🌐 Starting server validation for token:', validation.token || token);
       const adminToken = localStorage.getItem('adminToken');
+      console.log('🔑 Admin token found:', !!adminToken);
+      
+      const requestPayload = { token: validation.token || token };
+      console.log('📤 Sending request:', requestPayload);
+      
       const response = await fetch('/api/validate-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${adminToken}`,
         },
-        body: JSON.stringify({ token: validation.token }),
+        body: JSON.stringify(requestPayload),
       });
 
+      console.log('📥 Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        console.error('❌ HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const result = await response.json();
+      console.log('📊 Server response:', result);
 
       const scanResult: ScanResult = result.success ? {
         type: result.alreadyEntered ? 'warning' : 'success',
@@ -149,19 +233,35 @@ export default function ScannerPage() {
         message: result.error || 'Validation failed'
       };
 
+      console.log('✨ Final scan result:', scanResult);
       setScanMemory({ url: scannedText, result: scanResult, timestamp: now });
       setCurrentResult(scanResult);
 
+      // Play success chime for valid tickets (both new entries and already entered)
+      if (result.success) {
+        console.log('🔔 Playing success chime');
+        playSuccessChime();
+      }
+
     } catch (error) {
+      console.error('💥 Scan processing error:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        scannedText,
+        processingUrl: processingUrlRef.current
+      });
+      
       const errorResult: ScanResult = {
         type: 'error',
         title: '❌ Processing Failed',
-        message: 'Network or server error'
+        message: `Network or server error: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
       
       setScanMemory({ url: scannedText, result: errorResult, timestamp: now });
       setCurrentResult(errorResult);
     } finally {
+      console.log('🏁 Scan processing complete, cleaning up');
       setIsProcessing(false);
       processingUrlRef.current = '';
     }
@@ -228,16 +328,16 @@ export default function ScannerPage() {
         const containerWidth = containerElement?.clientWidth || 400;
         const isMobile = window.innerWidth < 640;
         
-        // On mobile: use 95% of container width to maximize scan area
-        // On desktop: use 70% for comfortable scanning
-        const qrboxSize = isMobile 
-          ? Math.floor(containerWidth * 0.95) 
-          : Math.min(400, Math.max(200, Math.floor(containerWidth * 0.7)));
+        // Remove qrbox to use full camera feed as scan area
+        // const qrboxSize = isMobile 
+        //   ? Math.floor(containerWidth * 0.95) 
+        //   : Math.min(400, Math.max(200, Math.floor(containerWidth * 0.7)));
 
         // Initialize scanner with mobile-optimized config
         const config = {
           fps: 10,
-          qrbox: qrboxSize,
+          // Remove qrbox to use entire camera feed as scan area
+          // qrbox: qrboxSize,
           aspectRatio: 1.0,
           rememberLastUsedCamera: true,
           showTorchButtonIfSupported: true,
@@ -298,13 +398,20 @@ export default function ScannerPage() {
               padding: 0 !important;
             }
             
-            /* Thin scan box border on mobile */
+            /* Remove scan box overlay since we're using full feed */
             #qr-scanner-container canvas {
-              border-width: 3px !important;
+              display: none !important;
             }
             
             /* Hide library's default footer on mobile to save space */
             #qr-scanner-container__dashboard_section_csr {
+              display: none !important;
+            }
+          }
+          
+          /* Desktop - also remove scan box overlay */
+          @media (min-width: 641px) {
+            #qr-scanner-container canvas {
               display: none !important;
             }
           }
