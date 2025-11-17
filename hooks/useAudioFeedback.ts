@@ -3,28 +3,39 @@ import { useCallback } from 'react';
 export const useAudioFeedback = () => {
   const playSuccessChime = useCallback(() => {
     try {
-      // Create a simple success chime using Web Audio API
+      // Create a more alerting success chime similar to payment apps
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // Create two distinct tones for a "ding-dong" effect
+      const createTone = (frequency: number, startTime: number, duration: number) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        oscillator.type = 'sine';
+        
+        // Sharp attack, quick decay for alerting effect
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.02); // Quick attack
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
       
-      // Pleasant success tone (C major chord)
-      oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-      oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-      oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+      const currentTime = audioContext.currentTime;
       
-      oscillator.type = 'sine';
+      // First tone: Higher pitch (like "ding")
+      createTone(880, currentTime, 0.15); // A5
       
-      // Fade in and out
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.05);
-      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
+      // Second tone: Lower pitch (like "dong") - slightly delayed
+      createTone(659.25, currentTime + 0.12, 0.2); // E5
       
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.4);
+      // Optional third tone for emphasis on very successful scans
+      createTone(523.25, currentTime + 0.25, 0.15); // C5
       
       // Clean up
       setTimeout(() => {
@@ -33,7 +44,7 @@ export const useAudioFeedback = () => {
         } catch (e) {
           // Ignore cleanup errors
         }
-      }, 500);
+      }, 600);
     } catch (error) {
       // Silently fail if audio context not supported
     }
