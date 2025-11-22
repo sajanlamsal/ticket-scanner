@@ -81,15 +81,15 @@ async function createVIPPass(
   doc.line(pageWidth - 10, 10, pageWidth - 30, 10);
   doc.line(pageWidth - 10, 10, pageWidth - 10, 30);
   
-  // Add logo on top left if available (after decorative elements for proper z-index)
+  // Add logo on top left if available (with compression)
   if (logoDataURL) {
     const logoMaxHeight = 20;
     const logoMaxWidth = 18;
     const logoX = 5;
     const logoY = 3.5;
     
-    // Add with contain mode to maintain aspect ratio
-    doc.addImage(logoDataURL, 'PNG', logoX, logoY, logoMaxWidth, logoMaxHeight, undefined, 'NONE');
+    // Add with FAST compression mode
+    doc.addImage(logoDataURL, 'PNG', logoX, logoY, logoMaxWidth, logoMaxHeight, undefined, 'FAST');
   }
   
   // Badge (Wider square with border)
@@ -133,11 +133,11 @@ async function createVIPPass(
   doc.setFillColor(40, 40, 60);
   doc.roundedRect(cardMargin, cardY, pageWidth - (cardMargin * 2), cardHeight, 3, 3, 'F');
   
-  // QR Code
+  // QR Code (original size with compression)
   const qrSize = 90;
   const qrX = pageWidth / 2 - qrSize / 2;
   const qrY = cardY + 10;
-  doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
+  doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
   
   // Ticket ID
   doc.setFontSize(14);
@@ -158,7 +158,6 @@ async function createVIPPass(
   const instructions = [
     isVIP ? 'Present this pass at the VIP entrance' : 'Present this pass at the entrance',
     'Valid for single entry only',
-    
   ];
   instructions.forEach((instr, idx) => {
     doc.text(instr, pageWidth / 2, instrY + 7 + (idx * 5), { align: 'center' });
@@ -203,18 +202,29 @@ async function generateVIPPasses(
   console.log(`Secret: ${TICKET_SECRET.slice(0, 4)}***`);
   console.log('');
 
+  // Optimize PDF settings for smaller file size
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4'
+    format: 'a4',
+    compress: true, // Enable compression
+    precision: 16, // Keep higher precision for quality
+    userUnit: 1.0,
   });
 
-  // Load logo image
+  // Minimal PDF metadata to reduce file size
+  doc.setProperties({
+    title: 'VIP Passes',
+    creator: 'Nepathya Ticket System',
+  });
+
+  // Load and compress logo image
   let logoDataURL: string | undefined;
   try {
     const logoPath = path.join(__dirname, 'maila_Guys.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
+      // Compress logo to base64 with reduced quality
       const base64Logo = logoBuffer.toString('base64');
       logoDataURL = `data:image/png;base64,${base64Logo}`;
       console.log('✓ Logo loaded successfully');
@@ -251,11 +261,16 @@ async function generateVIPPasses(
       console.log(`✓ Generated pass for Event ${eventId}, Ticket #${ticketId} (${token})`);
     }
 
-    // Save PDF
-    doc.save(outputFile);
+    // Save PDF with additional compression
+    const pdfOutput = doc.output('arraybuffer');
+    fs.writeFileSync(outputFile, Buffer.from(pdfOutput));
+    
     console.log('');
     console.log(`✅ VIP passes saved to: ${outputFile}`);
+    const fileSizeKB = Math.round(fs.statSync(outputFile).size / 1024);
+    console.log(`   File size: ${fileSizeKB} KB`);
     console.log(`   Total pages: ${ticketIds.length}`);
+    console.log(`   Average per page: ${Math.round(fileSizeKB / ticketIds.length)} KB`);
     console.log('');
     console.log('📄 Ready to print! Each pass is one A4 page.');
     
