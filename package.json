@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "generate-tokens": "tsx scripts/generate_tokens.ts",
+    "generate-sql": "tsx scripts/utilities/generate_sql_inserts.ts",
+    "generate-vip-passes": "tsx scripts/utilities/generate_vip_passes.ts",
     "seed-admin": "tsx scripts/seed_admin.ts",
     "type-check": "tsc --noEmit"
   },

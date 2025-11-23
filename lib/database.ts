@@ -32,6 +32,13 @@ export interface AdminUser {
   created_at: string;
 }
 
+export interface OnlineTicket {
+  id: number;
+  online_ticket_number: string;
+  entered_at?: string | null;
+  created_at: string;
+}
+
 class DatabaseManager {
   private sqlite?: Database.Database;
   private postgres?: Pool;
@@ -225,6 +232,92 @@ class DatabaseManager {
       return this.getTicketById(ticketId);
     }
     
+    throw new Error('Database not initialized');
+  }
+
+  // Online ticket operations
+  async getOnlineTicketByNumber(ticketNumber: string): Promise<OnlineTicket | null> {
+    if (this.dbType === 'sqlite' && this.sqlite) {
+      const stmt = this.sqlite.prepare('SELECT * FROM online_tickets WHERE online_ticket_number = ?');
+      return stmt.get(ticketNumber) as OnlineTicket | undefined || null;
+    } else if (this.postgres) {
+      const result = await this.postgres.query('SELECT * FROM online_tickets WHERE online_ticket_number = $1', [ticketNumber]);
+      return result.rows[0] || null;
+    }
+    throw new Error('Database not initialized');
+  }
+
+  async markOnlineTicketEntered(ticketNumber: string): Promise<{ success: boolean; alreadyEntered: boolean; ticket: OnlineTicket | null }> {
+    if (this.dbType === 'sqlite' && this.sqlite) {
+      return this.sqlite.transaction(() => {
+        const getStmt = this.sqlite!.prepare('SELECT * FROM online_tickets WHERE online_ticket_number = ?');
+        const ticket = getStmt.get(ticketNumber) as OnlineTicket | undefined;
+        
+        if (!ticket) {
+          return { success: false, alreadyEntered: false, ticket: null };
+        }
+
+        if (ticket.entered_at) {
+          return { success: true, alreadyEntered: true, ticket };
+        }
+
+        const updateStmt = this.sqlite!.prepare(`
+          UPDATE online_tickets 
+          SET entered_at = CURRENT_TIMESTAMP
+          WHERE online_ticket_number = ? AND entered_at IS NULL
+        `);
+        
+        const result = updateStmt.run(ticketNumber);
+        
+        if (result.changes > 0) {
+          const updatedTicket = getStmt.get(ticketNumber) as OnlineTicket;
+          return { success: true, alreadyEntered: false, ticket: updatedTicket };
+        }
+
+        // Race condition - someone else marked it
+        const finalTicket = getStmt.get(ticketNumber) as OnlineTicket;
+        return { success: true, alreadyEntered: true, ticket: finalTicket };
+      })();
+    } else if (this.postgres) {
+      const client = await this.postgres.connect();
+      try {
+        await client.query('BEGIN');
+        
+        const selectResult = await client.query(
+          'SELECT * FROM online_tickets WHERE online_ticket_number = $1 FOR UPDATE',
+          [ticketNumber]
+        );
+        
+        const ticket = selectResult.rows[0];
+        if (!ticket) {
+          await client.query('ROLLBACK');
+          return { success: false, alreadyEntered: false, ticket: null };
+        }
+
+        if (ticket.entered_at) {
+          await client.query('ROLLBACK');
+          return { success: true, alreadyEntered: true, ticket };
+        }
+
+        const updateResult = await client.query(
+          'UPDATE online_tickets SET entered_at = now() WHERE online_ticket_number = $1 AND entered_at IS NULL RETURNING *',
+          [ticketNumber]
+        );
+
+        await client.query('COMMIT');
+        
+        if (updateResult.rows.length > 0) {
+          return { success: true, alreadyEntered: false, ticket: updateResult.rows[0] };
+        }
+
+        return { success: true, alreadyEntered: true, ticket };
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
     throw new Error('Database not initialized');
   }
 

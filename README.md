@@ -12,6 +12,7 @@ A Next.js TypeScript application for QR-based event ticket verification with adm
 - 📊 **Admin dashboard** for ticket management and search
 - 🗄️ **Raw SQL support** for both SQLite and PostgreSQL
 - 🔒 **Security-first design** - secret never exposed to frontend
+- 🎨 **VIP Pass Generator** - Create beautiful, printable VIP passes (PDF)
 
 ## Tech Stack
 
@@ -107,7 +108,26 @@ This creates a CSV file `tickets-1-100.csv` with columns:
 - `token`: Generated hash (e.g., "x9K2mE")
 - `qrUrl`: Full URL for QR codes (e.g., "http://localhost:3000/entry/x9K2mE")
 
-### 6. Start Development Server
+### 6. Generate VIP Passes (Optional)
+
+Create beautiful, printable VIP passes with QR codes:
+
+```bash
+# Generate VIP passes for tickets 1-20 (Event 1)
+npm run generate-vip-passes -- --start=1 --end=20 --event-id=1 --event-name="Nepathya Concert 2025"
+
+# Generate for specific VIP guests (Event 1)
+npm run generate-vip-passes -- --tickets=1,5,10,25 --event-id=1 --event-name="VIP Backstage Pass"
+
+# Generate for different event (Event 2)
+npm run generate-vip-passes -- --start=1 --end=30 --event-id=2 --event-name="After Party VIP"
+```
+
+This creates a PDF file with one A4 page per ticket, ready for printing and distribution to VIP guests. Tokens are generated using the same algorithm as the main system (with event_id), ensuring they work seamlessly with your scanner.
+
+📖 **Full documentation**: See [VIP Pass Guide](./docs/VIP_PASS_GUIDE.md)
+
+### 7. Start Development Server
 
 ```bash
 npm run dev
