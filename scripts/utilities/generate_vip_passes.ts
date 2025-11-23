@@ -194,29 +194,15 @@ async function generateVIPPasses(
   eventId: number,
   host: string,
   outputFile: string,
-  customization: PassCustomization
+  customization: PassCustomization,
+  individual: boolean = false
 ): Promise<void> {
   console.log(`Generating VIP passes for ${ticketIds.length} tickets...`);
   console.log(`Event ID: ${eventId}`);
   console.log(`Host: ${host}`);
   console.log(`Secret: ${TICKET_SECRET.slice(0, 4)}***`);
+  console.log(`Mode: ${individual ? 'Individual files' : 'Single file'}`);
   console.log('');
-
-  // Optimize PDF settings for smaller file size
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-    compress: true, // Enable compression
-    precision: 16, // Keep higher precision for quality
-    userUnit: 1.0,
-  });
-
-  // Minimal PDF metadata to reduce file size
-  doc.setProperties({
-    title: 'VIP Passes',
-    creator: 'Nepathya Ticket System',
-  });
 
   // Load and compress logo image
   let logoDataURL: string | undefined;
@@ -224,7 +210,6 @@ async function generateVIPPasses(
     const logoPath = path.join(__dirname, 'maila_Guys.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
-      // Compress logo to base64 with reduced quality
       const base64Logo = logoBuffer.toString('base64');
       logoDataURL = `data:image/png;base64,${base64Logo}`;
       console.log('✓ Logo loaded successfully');
@@ -235,11 +220,40 @@ async function generateVIPPasses(
     console.log('⚠️  Could not load logo, continuing without logo');
   }
 
-  try {
-    for (let i = 0; i < ticketIds.length; i++) {
-      const ticketId = ticketIds[i];
-      
-      // Generate token using same algorithm as generate_tokens.ts
+  if (individual) {
+    // Create passes directory structure
+    const passesDir = path.join(__dirname, 'passes');
+    const eventDir = path.join(passesDir, `event-${eventId}`);
+    const timestampDir = path.join(eventDir, new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-'));
+    
+    // Ensure directories exist
+    fs.mkdirSync(passesDir, { recursive: true });
+    fs.mkdirSync(eventDir, { recursive: true });
+    fs.mkdirSync(timestampDir, { recursive: true });
+    
+    console.log(`📁 Saving individual passes to: ${path.relative(process.cwd(), timestampDir)}`);
+    console.log('');
+    
+    // Generate individual PDF files
+    const generatedFiles: string[] = [];
+    
+    for (const ticketId of ticketIds) {
+      // Create individual PDF
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+        precision: 16,
+        userUnit: 1.0,
+      });
+
+      doc.setProperties({
+        title: `${customization.passType || 'VIP'} Pass - Ticket #${ticketId}`,
+        creator: 'Nepathya Ticket System',
+      });
+
+      // Generate token
       const token = generateToken(ticketId, eventId);
       
       const ticketData: TicketData = {
@@ -252,31 +266,124 @@ async function generateVIPPasses(
       const qrUrl = `${host}/entry/${token}`;
       const qrDataURL = await generateQRCodeDataURL(qrUrl);
       
-      if (i > 0) {
-        doc.addPage();
-      }
-      
       await createVIPPass(doc, ticketData, qrDataURL, host, customization, logoDataURL);
       
-      console.log(`✓ Generated pass for Event ${eventId}, Ticket #${ticketId} (${token})`);
+      // Generate organized filename
+      const passType = (customization.passType || 'VIP').toLowerCase();
+      const individualFile = path.join(
+        timestampDir, 
+        `${passType}-pass-${String(ticketId).padStart(4, '0')}-${token}.pdf`
+      );
+      
+      // Save individual PDF
+      const pdfOutput = doc.output('arraybuffer');
+      fs.writeFileSync(individualFile, Buffer.from(pdfOutput));
+      generatedFiles.push(individualFile);
+      
+      console.log(`✓ ${path.basename(individualFile)} (Event ${eventId}, Ticket #${ticketId})`);
     }
 
-    // Save PDF with additional compression
-    const pdfOutput = doc.output('arraybuffer');
-    fs.writeFileSync(outputFile, Buffer.from(pdfOutput));
-    
+    // Create index file with details
+    const indexFile = path.join(timestampDir, 'README.md');
+    const indexContent = `# ${customization.passType || 'VIP'} Passes - Event ${eventId}
+
+Generated on: ${new Date().toLocaleString()}
+Total passes: ${generatedFiles.length}
+Event: ${customization.eventName || 'N/A'}
+
+## Pass Details
+${generatedFiles.map((file, index) => {
+  const ticketId = ticketIds[index];
+  const token = generateToken(ticketId, eventId);
+  return `- **${path.basename(file)}**
+  - Ticket ID: ${ticketId}
+  - Token: ${token}
+  - QR URL: ${host}/entry/${token}`;
+}).join('\n\n')}
+
+## Distribution Instructions
+1. Each PDF file contains one ${(customization.passType || 'VIP').toLowerCase()} pass
+2. Send individual files to respective ticket holders
+3. Passes are ready for digital distribution or printing
+4. Each pass contains a unique QR code for entry validation
+`;
+
+    fs.writeFileSync(indexFile, indexContent);
+
     console.log('');
-    console.log(`✅ VIP passes saved to: ${outputFile}`);
-    const fileSizeKB = Math.round(fs.statSync(outputFile).size / 1024);
-    console.log(`   File size: ${fileSizeKB} KB`);
-    console.log(`   Total pages: ${ticketIds.length}`);
-    console.log(`   Average per page: ${Math.round(fileSizeKB / ticketIds.length)} KB`);
-    console.log('');
-    console.log('📄 Ready to print! Each pass is one A4 page.');
+    console.log(`✅ Generated ${generatedFiles.length} individual passes:`);
     
-  } catch (error) {
-    console.error('❌ Error generating VIP passes:', error);
-    throw error;
+    let totalSize = 0;
+    generatedFiles.forEach((file, index) => {
+      const fileSizeKB = Math.round(fs.statSync(file).size / 1024);
+      totalSize += fileSizeKB;
+      console.log(`   ${path.basename(file)}: ${fileSizeKB} KB`);
+    });
+    
+    console.log(`   README.md: ${Math.round(fs.statSync(indexFile).size / 1024)} KB`);
+    console.log(`   Total size: ${totalSize} KB`);
+    console.log('');
+    console.log(`📁 All files saved in: ${path.relative(process.cwd(), timestampDir)}`);
+    console.log('📄 Ready to distribute! Each ticket is in a separate PDF file.');
+    console.log('📋 Check README.md for detailed pass information.');
+    
+  } else {
+    // Generate single combined PDF (existing logic)
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+      precision: 16,
+      userUnit: 1.0,
+    });
+
+    doc.setProperties({
+      title: 'VIP Passes',
+      creator: 'Nepathya Ticket System',
+    });
+
+    try {
+      for (let i = 0; i < ticketIds.length; i++) {
+        const ticketId = ticketIds[i];
+        
+        const token = generateToken(ticketId, eventId);
+        
+        const ticketData: TicketData = {
+          id: ticketId,
+          eventId: eventId,
+          token: token,
+          eventName: customization.eventName
+        };
+        
+        const qrUrl = `${host}/entry/${token}`;
+        const qrDataURL = await generateQRCodeDataURL(qrUrl);
+        
+        if (i > 0) {
+          doc.addPage();
+        }
+        
+        await createVIPPass(doc, ticketData, qrDataURL, host, customization, logoDataURL);
+        
+        console.log(`✓ Generated pass for Event ${eventId}, Ticket #${ticketId} (${token})`);
+      }
+
+      const pdfOutput = doc.output('arraybuffer');
+      fs.writeFileSync(outputFile, Buffer.from(pdfOutput));
+      
+      console.log('');
+      console.log(`✅ VIP passes saved to: ${outputFile}`);
+      const fileSizeKB = Math.round(fs.statSync(outputFile).size / 1024);
+      console.log(`   File size: ${fileSizeKB} KB`);
+      console.log(`   Total pages: ${ticketIds.length}`);
+      console.log(`   Average per page: ${Math.round(fileSizeKB / ticketIds.length)} KB`);
+      console.log('');
+      console.log('📄 Ready to print! Each pass is one A4 page.');
+      
+    } catch (error) {
+      console.error('❌ Error generating VIP passes:', error);
+      throw error;
+    }
   }
 }
 
@@ -296,6 +403,7 @@ program
   .option('--subtitle <text>', 'Custom subtitle text')
   .option('--footer <text>', 'Custom footer text')
   .option('--type <type>', 'Pass type: VIP or STANDARD', 'VIP')
+  .option('--individual', 'Generate separate PDF files in organized passes/ folder')
   .action(async (options) => {
     let ticketIds: number[] = [];
     
@@ -343,7 +451,8 @@ program
       eventId,
       options.host,
       options.output,
-      customization
+      customization,
+      options.individual
     );
   });
 
