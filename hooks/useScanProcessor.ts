@@ -65,14 +65,14 @@ export const useScanProcessor = () => {
         // Not a URL, treat as direct token
       }
 
-      // Validate token format
+      // Validate token format and determine ticket type
       const validation = validateAndExtractToken(token);
       
       if (!validation.isValid) {
         const errorResult: ScanResult = {
           type: 'error',
           title: '❌ Invalid Ticket',
-          message: `Invalid token: ${token}`
+          message: validation.errorMessage || `Invalid token: ${token}`
         };
         
         setScanMemory({ url: scannedText, result: errorResult, timestamp: now });
@@ -82,11 +82,15 @@ export const useScanProcessor = () => {
         return;
       }
 
-      // Server validation
+      // Determine which API endpoint to use based on ticket type
       const adminToken = localStorage.getItem('adminToken');
-      const requestPayload = { token: validation.token || token };
+      const isOnlineTicket = validation.ticketType === 'online';
+      const endpoint = isOnlineTicket ? '/api/validate-online-ticket' : '/api/validate-token';
+      const requestPayload = isOnlineTicket 
+        ? { ticketNumber: validation.token }
+        : { token: validation.token };
       
-      const response = await fetch('/api/validate-token', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,8 +111,9 @@ export const useScanProcessor = () => {
         title: result.alreadyEntered ? '⚠️ Already Entered' : '✅ Entry Recorded',
         message: result.alreadyEntered ? 'Previously scanned' : 'Entry successful',
         details: {
+          ticketType: result.ticketType || 'token',
           eventName: result.eventName,
-          ticketId: result.ticketId,
+          ticketId: result.ticketId || result.ticketNumber,
           attendee_name: result.attendee_name,
           entered_at: result.entered_at
         }
